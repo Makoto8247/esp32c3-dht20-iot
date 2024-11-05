@@ -1,0 +1,5 @@
+build/
+.seggings/
+sdkconfig
+sdkconfig.old
+*.projbuild
