@@ -6,7 +6,6 @@
 #include <unistd.h>
 #include <driver/i2c.h>
 #include <driver/gpio.h>
-#include <math.h>
 
 #define SDA_PIN GPIO_NUM_6
 #define SCL_PIN GPIO_NUM_7
@@ -44,11 +43,11 @@ void app_main(void)
         processed_data = rx_data[1] << 12;
         processed_data |= rx_data[2] << 4;
         processed_data |= (rx_data[3] & 0xF0) >> 4;
-        humi_data = (double)processed_data/ldexp(2, 20) * 100;
+        humi_data = (double)processed_data/1048576 * 100;
         processed_data = (rx_data[3] & 0x0F) << 16;
         processed_data |= rx_data[4] << 8;
         processed_data |= rx_data[5];
-        temp_data = (double)processed_data/ldexp(2, 20) * 200 - 50;
+        temp_data = (double)processed_data/1048576 * 200 - 50;
         printf("Humidity = %3.2f%% : Temperature = %3.2fC\n", humi_data, temp_data);
         sleep(1);
         
