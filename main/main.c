@@ -32,8 +32,6 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id
 
 // Function to initialize Wi-Fi and connect to the network
 bool wifi_init(void) {
-	bool wifi_connected = false;
-	
     // Initialize NVS flash
     ESP_ERROR_CHECK(nvs_flash_init());
 
