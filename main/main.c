@@ -1,7 +1,12 @@
+#include "esp_err.h"
 #include "nvs_flash.h"
 #include "esp_wifi.h"
+#include "sdkconfig.h"
 #include <driver/i2c.h>
 #include <lwip/apps/sntp.h>
+#include <esp_http_client.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #define SDA_PIN GPIO_NUM_6
 #define SCL_PIN GPIO_NUM_7
@@ -10,6 +15,9 @@
 #define SLEEP_TIME_SECONDS (30 * 60)
 
 static bool wifi_connected = false;
+
+extern const char _binary_ESP32_pem_start[];
+extern const char _binary_ESP32_pem_end[];
 
 void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
@@ -100,6 +108,24 @@ void sync_time()
 	}
 }
 
+void http_get_request(const char* url)
+{	
+	esp_http_client_config_t config = {
+		.url = url,
+		.cert_pem = _binary_ESP32_pem_start
+	};
+	esp_http_client_handle_t client = esp_http_client_init(&config);
+	
+	esp_err_t err = esp_http_client_perform(client);
+	if(err == ESP_OK) {
+		printf("HTTP GET Request successful\n");
+	} else {
+		printf("HTTP GET Request failed: %s\n", esp_err_to_name(err));
+	}
+	
+	esp_http_client_cleanup(client);
+}
+
 void get_dht20_data(double* temp_data, double* humi_data) 
 {
 	uint32_t processed_data = 0;
@@ -109,7 +135,7 @@ void get_dht20_data(double* temp_data, double* humi_data)
 		0b00110011,
 		0b00000000
 	};
-	/*** DHT20 ***/
+	
 	// Commands to retrieve data
 	i2c_master_write_to_device(I2C_NUM_0, DHT20_ADDR, DHT20_CMD, sizeof(DHT20_CMD), 100);
 	vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -148,7 +174,13 @@ void app_main(void)
 	
 	while (true) {
 		get_dht20_data(&temp_data, &humi_data);
-        sleep(1);
+		
+		char* url = (char*)malloc((sizeof(CONFIG_GAS_URL) + 256) * sizeof(char));
+		sprintf(url, "%s?temperature=%3.2f&humidity=%3.2f", CONFIG_GAS_URL, temp_data, humi_data);
+		printf("%s\n", url);
+		http_get_request(url);
+        sleep(3);
         
+        free(url);
     }
 }
