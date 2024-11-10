@@ -1,12 +1,10 @@
-#include "esp_err.h"
 #include "nvs_flash.h"
 #include "esp_wifi.h"
-#include "sdkconfig.h"
+#include "esp_sleep.h"
 #include <driver/i2c.h>
 #include <lwip/apps/sntp.h>
 #include <esp_http_client.h>
-#include <stdio.h>
-#include <stdlib.h>
+
 
 #define SDA_PIN GPIO_NUM_6
 #define SCL_PIN GPIO_NUM_7
@@ -126,6 +124,50 @@ void http_get_request(const char* url)
 	esp_http_client_cleanup(client);
 }
 
+bool check_write_do()
+{
+	time_t now;
+	struct tm timeinfo;
+	time(&now);
+	localtime_r(&now, &timeinfo);
+	
+	int minutes = timeinfo.tm_min;
+	
+	 if ((minutes >= 55 || minutes <= 5) || (minutes >= 25 && minutes <= 35)) {
+        return true;
+    }
+    return false;
+}
+
+void go_to_sleep_until_next_interval() 
+{
+    time_t now;
+    struct tm timeinfo;
+    time(&now);
+    localtime_r(&now, &timeinfo);
+
+    int minutes = timeinfo.tm_min;
+    int seconds = timeinfo.tm_sec;
+
+    int sleep_minutes;
+    if(25 <= minutes && minutes <= 35){ 
+		sleep_minutes = 60 - minutes;
+    } else {
+		sleep_minutes = 60 - (minutes % 30);
+	    if (minutes < 30) {
+	        sleep_minutes %= 30;
+	    }
+	}
+    
+    int sleep_seconds = (sleep_minutes * 60) - seconds;
+
+    printf("Going to sleep for %d seconds (current time: %02d:%02d:%02d)\n",
+           sleep_seconds, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+
+    esp_sleep_enable_timer_wakeup(sleep_seconds * 1000000ULL);
+    esp_deep_sleep_start();
+}
+
 void get_dht20_data(double* temp_data, double* humi_data) 
 {
 	uint32_t processed_data = 0;
@@ -172,15 +214,15 @@ void app_main(void)
 	
 	sync_time();
 	
-	while (true) {
+	if (check_write_do()) {
 		get_dht20_data(&temp_data, &humi_data);
 		
 		char* url = (char*)malloc((sizeof(CONFIG_GAS_URL) + 256) * sizeof(char));
-		sprintf(url, "%s?temperature=%3.2f&humidity=%3.2f", CONFIG_GAS_URL, temp_data, humi_data);
-		printf("%s\n", url);
+		sprintf(url, "%s?temperature=%3.2f&humidity=%1.4f", CONFIG_GAS_URL, temp_data, humi_data/100);
 		http_get_request(url);
         sleep(3);
         
         free(url);
     }
+    go_to_sleep_until_next_interval();
 }
