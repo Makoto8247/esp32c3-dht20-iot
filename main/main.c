@@ -153,9 +153,10 @@ void go_to_sleep_until_next_interval()
     if(25 <= minutes && minutes <= 35){ 
 		sleep_minutes = 60 - minutes;
     } else {
-		sleep_minutes = 60 - (minutes % 30);
 	    if (minutes < 30) {
-	        sleep_minutes %= 30;
+	    	sleep_minutes = 30 - minutes;
+	    } else {
+	    	sleep_minutes = 30 + (60 - minutes);
 	    }
 	}
     
